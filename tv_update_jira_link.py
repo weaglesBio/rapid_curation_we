@@ -6,6 +6,7 @@ import os
 import json
 import requests
 import subprocess
+import re
 
 jbrowse_prod_directory = "/lustre/scratch123/tol/share/jbrowse/prod/data"
 jbrowse_dev_directory = "/lustre/scratch123/tol/share/jbrowse/dev/data"
@@ -86,15 +87,9 @@ def get_taxonid_from_tolid(tolid):
         return response.json()
 
 def main():
-    # print(get_all_from_jira(5, 2, f'[]', 'jira_issue',""))
-    # curation_dates = get_curation_dates()
-# AND (Treeval is EMPTY OR Treeval ~ NA)
     tja = ToLJiraAuth()
-    # jql_request = f"project in (GRIT,RC) AND status = Curation AND (Treeval is EMPTY OR Treeval ~ NA)"
     jql_request = f"project in (GRIT,RC) AND status = Curation"
     results = tja.auth_jira.search_issues(jql_request,maxResults=0, expand='changelog')
-
-
 
     for result in results:
         update_issue = False
@@ -105,16 +100,17 @@ def main():
         existing_treeval_data_dict = {}
 
         species_id = issue.fields.customfield_11627
-        # print(species_id)
-        # if species_id == "idCulPerx1":
-        #     continue
-
         tolid_assem = issue.fields.customfield_11643
 
         treeval_run_path = os.path.dirname(os.path.dirname(jm.get_hap1_path(issue)))
 
-        # existing_treeval_data_string = issue.fields.customfield_12800
         existing_treeval_data_string = issue.fields.customfield_12800
+
+        species_name = issue.fields.customfield_11677.rsplit('/', 5)[1]
+        #print(species_name)
+
+        project = issue.fields.summary.split(" ")[1]
+        # print(project)
 
         if existing_treeval_data_string:
             try:
@@ -194,19 +190,19 @@ def main():
         values_dict["start"] = curation_date
 
         # Add BTK links
-        btk_plots = glob.glob(f"{btk_directory}/{species_id}*.fa.ascc")
+        btk_plots = glob.glob(f"{btk_directory}/{species_id}*.fa")
 
         btk_pri_plot = ""
         btk_hap_plot = ""
         btk_mit_plot = ""
         for btk_plot in btk_plots:
 
-            btk_plot_name = btk_plot.split("/")[-1].replace('.fa.ascc','')
+            btk_plot_name = btk_plot.split("/")[-1].replace('.fa','')
 
             if btk_plot_name.endswith("-MT"):
                 btk_mit_plot = btk_plot_name
 
-            elif btk_plot_name.endswith(".haplotigs"):
+            elif btk_plot_name.endswith(".haplotigs") or btk_plot_name.endswith(".hap2"):
                 btk_hap_plot = btk_plot_name
 
             else:
@@ -261,30 +257,97 @@ def main():
                 else:
                     values_dict["kmer_plot"] = "N"
 
+        # Add ToLQC path
+        tolqc_data_path = "/lustre/scratch123/tol/tolqc/data"
+        tolqc_entries = glob.glob(f"{tolqc_data_path}/*/*/{species_name}")
+        # print(jbrowse_prod_runs)
+        run = 0
+        entry_values = {}
+        for tolqc_entry in tolqc_entries:
+
+            tolqc_value = tolqc_entry.replace(tolqc_data_path + "/", "")
+            entry_values[run] = tolqc_value
+            # entry_values[run] = tolqc_value.split("/")[0]
+            run += 1
+
+        if len(entry_values) > 1:
+            if project == "Darwin":
+                # Check if only one option
+                valid_option = []
+                for val in entry_values.values():
+                    if val.startswith("darwin"):
+                        valid_option.append(val)
+
+                if len(valid_option) == 1:
+                    values_dict["tolqc_path"] = valid_option[0]
+                else:
+                    # print(project)
+                    # print(entry_values)
+                    values_dict["tolqc_path"] = ""
+            elif project == "ASG":
+                # Check if only one option
+                valid_option = []
+                for val in entry_values.values():
+                    if val.startswith("asg"):
+                        valid_option.append(val)
+
+                if len(valid_option) == 1:
+                    values_dict["tolqc_path"] = valid_option[0]
+                else:
+                    # print(project)
+                    # print(entry_values)
+                    values_dict["tolqc_path"] = "" 
+            elif project == "TOL":
+                # Check if only one option
+                valid_option = []
+                for val in entry_values.values():
+                    if val.startswith("tol") or val.startswith("lawniczak") or val.startswith("meier") or val.startswith("durbin"):
+                        valid_option.append(val)
+
+                if len(valid_option) == 1:
+                    values_dict["tolqc_path"] = valid_option[0]
+                else:
+                    # print(project)
+                    # print(entry_values)
+                    values_dict["tolqc_path"] = "" 
+            else:
+                # print(project)
+                # print(entry_values)
+                values_dict["tolqc_path"] = "" 
+
+        elif len(entry_values) == 0:
+            values_dict["tolqc_path"] = ""  
+        else:
+            values_dict["tolqc_path"] = entry_values[0]
+
+        # Add contig LR
+        scaffold_l90 = '-'
+        contig_l90 = '-'
+
+        scaffold_l90_regex = re.compile(r'SCAFFOLD[ \t\n\r\f\v]N90 = [0-9]+, L90 = ([0-9]+)')
+        contig_l90_regex = re.compile(r'CONTIG[ \t\n\r\f\v]N90 = [0-9]+, L90 = ([0-9]+)')
+
+        sl90 = scaffold_l90_regex.search(issue.fields.description)
+        cl90 = contig_l90_regex.search(issue.fields.description)
+
+        if sl90:
+            scaffold_l90 = sl90.group(1)
+
+        if cl90:
+            contig_l90 = cl90.group(1)
+
+        values_dict["scaffold_l90"] = scaffold_l90
+        values_dict["contig_l90"] = contig_l90
+
         # Add GoaT link
         taxon_response = get_taxonid_from_tolid(species_id)
 
         if isinstance(taxon_response, int):
             values_dict["taxon_id"] = taxon_response
 
-        # print("======================================")
-        existing_treeval_data_string
+        # New data string
         out_string = json.dumps(values_dict)
 
-        # if len(out_string) > 255:
-        #     excess = len(out_string) - 255
-        #     print(f"{species_id} output is {excess} characters too long")
-
-        # print("Current:")
-        # print(existing_treeval_data_string)
-        # print("New:")
-        # print(out_string)
-        # print("")
-        # print("Current keys:")
-        # print(existing_treeval_data_dict.keys())
-        # print("New keys:")
-        # print(values_dict.keys())
-        # print("")
         # Check if existing data different, if so update.
         for key in values_dict.keys():
             if existing_treeval_data_dict.get(key) == None:
@@ -303,7 +366,6 @@ def main():
         # customfield_12800 - Treeval data
         if update_issue:
             print(f"To Update - {species_id}")
-
             issue.update(fields={'customfield_12800': out_string})
         # print("======================================")
 

@@ -44,6 +44,7 @@ species_dict = {
             'lp': ['monocots','AlloteropsisSemialata-ASEM_AUS1_V1,TriticumTurgidum-Svevo_v1,TyphaLatifolia-TyphaL0001',''],
             'ld': ['monocots','TriticumTurgidum.Svevo_v1,TyphaLatifolia.TyphaL0001','liliopsida_odb10'],
             'm': ['mammals','BosTaurus.ARSUCD1_3,CanisLupusFamiliaris.Dog10K_Tasha,FalisCatus.Fca126_mat1','mammalia_odb10'],
+            'ng': ['nematode','OscheiusTipulae.ASM1342590v1,CaenorhabditisElegans.WBcel235,Gae_host.Gae','nematoda_odb10'],
             'nr': ['nematode','OscheiusTipulae.ASM1342590v1,CaenorhabditisElegans.WBcel235,Gae_host.Gae','nematoda_odb10'],
             'nx': ['nematode','OscheiusTipulae.ASM1342590v1,CaenorhabditisElegans.WBcel235,Gae_host.Gae','nematoda_odb10'],
             'pe': ['protists','',''],
@@ -71,6 +72,7 @@ species_dict = {
             'wg': ['annelids','',''],
             'wl': ['annelids','',''],
             'wk': ['annelids','',''],
+            'wp': ['annelids','',''],
             'ws': ['annelids','','']
 }
 
@@ -236,8 +238,9 @@ def main():
 
     # Get list awaiting telo check
     tja = ToLJiraAuth()
-    jql_request = f"project = RC AND status = 'HiC Building' AND assignee = 'Will Eagles' AND 'Telomere motif k-mer length' is EMPTY ORDER BY priority DESC, updated DESC"
+    jql_request = f"project in (RC,GRIT) AND status in ('HiC Building','geval analysis') AND assignee = 'Will Eagles' AND 'Telomere motif k-mer length' is EMPTY ORDER BY priority DESC, updated DESC"
     # jql_request = f"status in ('HiC Building', 'geval analysis', 'curation') AND assignee = 'Will Eagles' ORDER BY priority DESC, updated DESC"
+
     # jql_request = f"key = 'RC-1347'"
     results = tja.auth_jira.search_issues(jql_request)
 
@@ -249,9 +252,9 @@ def main():
         
         species_id = jm.get_species_id(issue)
 
-        if species_id == "idCulPerx1":
-            continue
-
+        # if species_id == "idCulPerx1":
+        #     continue
+        print(species_id)
         hap1_id, hap2_id, merged_id = jm.get_treeval_run_ids(issue)
 
         treeval_run_path = os.path.dirname(os.path.dirname(jm.get_hap1_path(issue)))
@@ -276,7 +279,7 @@ def main():
                     telos_ready.append(f"{merged_path}")
 
     telos = {}
-    print(telos_ready)
+    # print(telos_ready)
     for tv_path_int in range(len(telos_ready)):
 
         tv_path = telos_ready[tv_path_int]

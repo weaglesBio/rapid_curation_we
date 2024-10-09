@@ -37,9 +37,8 @@ def main():
 
     tja = ToLJiraAuth()
     # jql_request = f"'Sample ID' ~ 'xcSepAtla11'"
-    # jql_request = f"project = RC AND status = 'HiC Building' AND assignee is EMPTY  AND  'Sample ID' ~ 'ilP*' ORDER BY priority DESC, updated DESC"
     jql_request = f"project = RC AND status = 'HiC Building' AND assignee is EMPTY ORDER BY priority DESC, updated DESC"
-    # jql_request = f"Project in ('ToL Assembly curation') AND (status = 'geval analysis' OR status = 'gEVAL QC') AND assignee is EMPTY ORDER BY priority DESC, updated DESC"
+    # jql_request = f"project = GRIT AND status = 'geval analysis' AND 'Sample ID' ~ 'bColPal1' AND assignee is EMPTY ORDER BY priority DESC, updated DESC"
     results = tja.auth_jira.search_issues(jql_request)
 
     # Return most recently created entry if there are multiple with same name.
@@ -51,9 +50,6 @@ def main():
         fails = []
         issue = tja.auth_jira.issue(result)
         species_id = jm.get_species_id(issue)
- 
-        # if species_id == "idCulPerx1":
-        #     continue
 
         jql_check_count_request = f"project in (RC, GRIT) AND 'Sample ID' ~ '{species_id}'"
         canonical_run_count = len(tja.auth_jira.search_issues(jql_check_count_request))
@@ -195,15 +191,15 @@ def main():
     print("Success")
     for species_id in successes.keys(): 
         print(f"{species_id}")
-    print("")
-    print("TELOMERE SCRIPT")
-    print("")
-    print("source activate curation_v2")
-    print("unset PYTHONPATH")
+    # print("")
+    # print("TELOMERE SCRIPT")
+    # print("")
+    # print("source activate curation_v2")
+    # print("unset PYTHONPATH")
     for species_id,path in successes.items(): 
-        # launch_telo_finder(species_id, path)
-        print(f"cd {path}/data")
-        print(f"echo 'python ~alt/python/bin/telo_finder.py ref.fa'|bsub -J telo_{species_id} -q normal -o d.o -e d.e -n 1 -M40000 -R'select[mem>40000] rusage[mem=40000] span[hosts=1]'")
+        launch_telo_finder(species_id, path)
+        # print(f"cd {path}/data")
+        # print(f"echo 'python ~alt/python/bin/telo_finder.py ref.fa'|bsub -J telo_{species_id} -q normal -o d.o -e d.e -n 1 -M40000 -R'select[mem>40000] rusage[mem=40000] span[hosts=1]'")
 
 if __name__ == "__main__":
     main()
